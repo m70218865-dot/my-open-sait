@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Время и Секундомер</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+    color: #fff;
+    overflow-x: hidden;
+  }
+
+  /* ===== ЗВЁЗДЫ НА ФОНЕ ===== */
+  .stars, .stars2 {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stars {
+    background: transparent url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><circle cx="20" cy="30" r="1" fill="white" opacity="0.8"/><circle cx="120" cy="80" r="0.8" fill="white" opacity="0.6"/><circle cx="60" cy="150" r="1.2" fill="white" opacity="0.9"/><circle cx="180" cy="40" r="0.7" fill="white" opacity="0.5"/><circle cx="90" cy="100" r="1" fill="white" opacity="0.7"/><circle cx="150" cy="180" r="0.9" fill="white" opacity="0.8"/></svg>') repeat;
+    animation: twinkle 8s ease-in-out infinite;
+  }
+
+  .stars2 {
+    background: transparent url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><circle cx="50" cy="60" r="0.6" fill="white" opacity="0.5"/><circle cx="200" cy="150" r="0.8" fill="white" opacity="0.7"/><circle cx="100" cy="250" r="0.5" fill="white" opacity="0.4"/><circle cx="260" cy="50" r="0.7" fill="white" opacity="0.6"/></svg>') repeat;
+    animation: twinkle 12s ease-in-out infinite reverse;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* ===== ФОН ДЛЯ СЕКУНДОМЕРА (пульсирующие круги-радар) ===== */
+  .radar-bg {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vmin;
+    height: 100vmin;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  .radar-bg.visible {
+    opacity: 1;
+  }
+
+  .radar-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border: 2px solid rgba(0, 198, 255, 0.5);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    animation: radarPulse 4s ease-out infinite;
+    box-shadow: 0 0 30px rgba(0, 198, 255, 0.3), inset 0 0 30px rgba(0, 198, 255, 0.15);
+  }
+
+  .radar-ring:nth-child(2) { animation-delay: 1s; }
+  .radar-ring:nth-child(3) { animation-delay: 2s; }
+  .radar-ring:nth-child(4) { animation-delay: 3s; }
+
+  @keyframes radarPulse {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0.8;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0;
+    }
+  }
+
+  .radar-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200px;
+    height: 200px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 198, 255, 0.25) 0%, rgba(0, 114, 255, 0.1) 40%, transparent 70%);
+    animation: corePulse 4s ease-in-out infinite;
+  }
+
+  @keyframes corePulse {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.7;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.3);
+      opacity: 1;
+    }
+  }
+
+  .radar-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background:
+      linear-gradient(to right, transparent 49.8%, rgba(0, 198, 255, 0.08) 49.8%, rgba(0, 198, 255, 0.08) 50.2%, transparent 50.2%),
+      linear-gradient(to bottom, transparent 49.8%, rgba(0, 198, 255, 0.08) 49.8%, rgba(0, 198, 255, 0.08) 50.2%, transparent 50.2%);
+    pointer-events: none;
+  }
+
+  /* ===== ПЛАНЕТА ===== */
+  .earth-container {
+    position: fixed;
+    bottom: -40vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90vh;
+    height: 90vh;
+    max-width: 900px;
+    max-height: 900px;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  .earth-container.visible {
+    opacity: 0.9;
+  }
+
+  .earth {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      inset -40px -30px 80px rgba(0, 0, 0, 0.85),
+      inset 15px 15px 60px rgba(100, 180, 255, 0.15),
+      0 0 100px rgba(70, 140, 255, 0.5),
+      0 0 200px rgba(70, 140, 255, 0.25);
+    animation: earthGlow 6s ease-in-out infinite;
+  }
+
+  .earth::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 200%;
+    height: 100%;
+    background-image: url('earth.jpg');
+    background-size: 50% 100%;
+    background-repeat: repeat-x;
+    animation: rotate 60s linear infinite;
+    border-radius: 50%;
+  }
+
+  .earth::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, transparent 0%, transparent 35%, rgba(0, 0, 0, 0.3) 60%, rgba(0, 0, 0, 0.85) 100%);
+    pointer-events: none;
+  }
+
+  @keyframes rotate {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  @keyframes earthGlow {
+    0%, 100% {
+      box-shadow:
+        inset -40px -30px 80px rgba(0, 0, 0, 0.85),
+        inset 15px 15px 60px rgba(100, 180, 255, 0.15),
+        0 0 100px rgba(70, 140, 255, 0.5),
+        0 0 200px rgba(70, 140, 255, 0.25);
+    }
+    50% {
+      box-shadow:
+        inset -40px -30px 80px rgba(0, 0, 0, 0.85),
+        inset 15px 15px 60px rgba(100, 180, 255, 0.25),
+        0 0 130px rgba(70, 140, 255, 0.7),
+        0 0 250px rgba(70, 140, 255, 0.35);
+    }
+  }
+
+  /* ===== МАКЕТ ===== */
+  .app {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+  }
+
+  /* ===== ПАНЕЛЬ (выезжает при наведении) ===== */
+  .sidebar-trigger {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 100vh;
+    z-index: 1000;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100vh;
+    background: rgba(10, 15, 35, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transform: translateX(-100%);
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1001;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-hint {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 60px;
+    background: linear-gradient(180deg, #00c6ff, #0072ff);
+    border-radius: 0 8px 8px 0;
+    z-index: 999;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+    box-shadow: 0 0 20px rgba(0, 198, 255, 0.5);
+    pointer-events: none;
+  }
+
+  .sidebar-hint.hidden {
+    opacity: 0;
+  }
+
+  .logo {
+    font-size: 1.1rem;
+    font-weight: 300;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #a0d8ff;
+    margin-bottom: 30px;
+    padding-left: 12px;
+    text-shadow: 0 0 20px rgba(100, 180, 255, 0.5);
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: #a0a0c0;
+    font-family: inherit;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .nav-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+  }
+
+  .nav-btn.active {
+    background: linear-gradient(135deg, rgba(0, 198, 255, 0.15), rgba(0, 114, 255, 0.15));
+    border-color: rgba(0, 198, 255, 0.4);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(0, 198, 255, 0.15);
+  }
+
+  .nav-btn .icon {
+    font-size: 1.3rem;
+    width: 24px;
+    text-align: center;
+  }
+
+  /* ===== КОНТЕНТ ===== */
+  .content {
+    padding: 40px 30px 40px 50px;
+    min-width: 0;
+  }
+
+  .section {
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .section.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    text-shadow: 0 0 20px rgba(100, 180, 255, 0.5);
+  }
+
+  .subtitle {
+    color: #a0a0c0;
+    margin-bottom: 35px;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+  }
+
+  /* ===== СЕКУНДОМЕР ===== */
+  .stopwatch-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+  }
+
+  .stopwatch-display {
+    font-size: 5rem;
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+    margin: 30px 0 40px;
+    background: linear-gradient(90deg, #fff, #a0d8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    position: relative;
+  }
+
+  .stopwatch-display .ms {
+    font-size: 2.5rem;
+    color: #a0a0c0;
+    -webkit-text-fill-color: #a0a0c0;
+  }
+
+  .stopwatch-buttons {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn {
+    padding: 14px 32px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    font-family: inherit;
+    font-size: 1rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    min-width: 120px;
+  }
+
+  .btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .btn:active {
+    transform: translateY(0);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn.primary {
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    border-color: transparent;
+    box-shadow: 0 0 25px rgba(0, 150, 255, 0.4);
+  }
+
+  .btn.primary:hover {
+    box-shadow: 0 0 35px rgba(0, 150, 255, 0.6);
+  }
+
+  .btn.danger {
+    background: rgba(255, 60, 60, 0.15);
+    border-color: rgba(255, 60, 60, 0.4);
+    color: #ff8080;
+  }
+
+  .btn.danger:hover {
+    background: rgba(255, 60, 60, 0.25);
+  }
+
+  .laps {
+    margin-top: 40px;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .lap {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: rgba(15, 20, 40, 0.5);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .lap-num {
+    color: #8a8ab0;
+    font-size: 0.9rem;
+  }
+
+  .lap-time {
+    color: #a0d8ff;
+    font-weight: 500;
+  }
+
+  /* ===== МИРОВОЕ ВРЕМЯ ===== */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    max-width: 1100px;
+  }
+
+  .card {
+    background: rgba(15, 20, 40, 0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 24px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    opacity: 0.7;
+  }
+
+  .card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 198, 255, 0.2);
+    border-color: rgba(0, 198, 255, 0.4);
+  }
+
+  .city { font-size: 1.2rem; font-weight: 500; margin-bottom: 4px; }
+  .country {
+    font-size: 0.8rem; color: #8a8ab0;
+    text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px;
+  }
+  .time {
+    font-size: 2.4rem; font-weight: 300;
+    font-variant-numeric: tabular-nums; letter-spacing: 1px;
+    background: linear-gradient(90deg, #fff, #a0d8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .date { font-size: 0.85rem; color: #8a8ab0; margin-top: 6px; }
+  .day-part { position: absolute; top: 20px; right: 20px; font-size: 1.4rem; }
+
+  footer {
+    margin-top: 50px;
+    color: #6a6a8a;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    padding-bottom: 20px;
+  }
+
+  /* ===== МОБИЛЬНАЯ ВЕРСИЯ ===== */
+  @media (max-width: 768px) {
+    .content {
+      padding: 30px 16px;
+    }
+
+    h1 { font-size: 1.7rem; }
+
+    .stopwatch-display {
+      font-size: 3.2rem;
+      margin: 20px 0 30px;
+    }
+
+    .stopwatch-display .ms {
+      font-size: 1.6rem;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      font-size: 0.9rem;
+      min-width: 100px;
+    }
+
+    .earth-container {
+      width: 140vw;
+      height: 140vw;
+      bottom: -60vw;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Звёзды -->
+  <div class="stars"></div>
+  <div class="stars2"></div>
+
+  <!-- Радар (фон для секундомера) -->
+  <div class="radar-bg visible" id="radarBg">
+    <div class="radar-crosshair"></div>
+    <div class="radar-ring"></div>
+    <div class="radar-ring"></div>
+    <div class="radar-ring"></div>
+    <div class="radar-ring"></div>
+    <div class="radar-core"></div>
+  </div>
+
+  <!-- Планета -->
+  <div class="earth-container" id="earthContainer">
+    <div class="earth"></div>
+  </div>
+
+  <!-- Триггер и подсказка панели -->
+  <div class="sidebar-trigger" id="sidebarTrigger"></div>
+  <div class="sidebar-hint" id="sidebarHint"></div>
+
+  <!-- ПАНЕЛЬ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">⏱ Time</div>
+
+    <button class="nav-btn active" data-section="stopwatch">
+      <span class="icon">⏱</span>
+      <span>Секундомер</span>
+    </button>
+
+    <button class="nav-btn" data-section="worldtime">
+      <span class="icon">🌍</span>
+      <span>Мировое время</span>
+    </button>
+  </aside>
+
+  <!-- КОНТЕНТ -->
+  <main class="content">
+
+    <!-- СЕКУНДОМЕР -->
+    <section class="section active" id="stopwatch">
+      <h1>Секундомер</h1>
+      <p class="subtitle">Точный замер времени</p>
+
+      <div class="stopwatch-wrap">
+        <div class="stopwatch-display" id="swDisplay">00:00<span class="ms">.00</span></div>
+
+        <div class="stopwatch-buttons">
+          <button class="btn primary" id="swStart">Старт</button>
+          <button class="btn" id="swLap" disabled>Круг</button>
+          <button class="btn danger" id="swReset">Сброс</button>
+        </div>
+
+        <div class="laps" id="swLaps"></div>
+      </div>
+    </section>
+
+    <!-- МИРОВОЕ ВРЕМЯ -->
+    <section class="section" id="worldtime">
+      <h1>Мировое время</h1>
+      <p class="subtitle">Текущее время в крупнейших городах мира</p>
+      <div class="grid" id="clockGrid"></div>
+      <footer>Обновляется каждую секунду</footer>
+    </section>
+
+  </main>
+
+<script>
+  /* ============================================================
+     ПАНЕЛЬ — ОТКРЫТИЕ ПРИ НАВЕДЕНИИ
+  ============================================================ */
+  const sidebar = document.getElementById('sidebar');
+  const sidebarTrigger = document.getElementById('sidebarTrigger');
+  const sidebarHint = document.getElementById('sidebarHint');
+  let sidebarTimeout;
+
+  function openSidebar() {
+    clearTimeout(sidebarTimeout);
+    sidebar.classList.add('open');
+    sidebarHint.classList.add('hidden');
+  }
+
+  function closeSidebar(delay = 400) {
+    sidebarTimeout = setTimeout(() => {
+      sidebar.classList.remove('open');
+      sidebarHint.classList.remove('hidden');
+    }, delay);
+  }
+
+  // Наведение на невидимую зону слева
+  sidebarTrigger.addEventListener('mouseenter', openSidebar);
+
+  // Наведение на саму панель — держим открытой
+  sidebar.addEventListener('mouseenter', openSidebar);
+
+  // Уход с панели — закрываем с задержкой
+  sidebar.addEventListener('mouseleave', () => closeSidebar(400));
+
+  // На мобильных — тап по зоне открывает/закрывает
+  sidebarTrigger.addEventListener('click', () => {
+    if (sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+      sidebarHint.classList.remove('hidden');
+    } else {
+      openSidebar();
+    }
+  });
+
+  /* ============================================================
+     ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ
+  ============================================================ */
+  const navButtons = document.querySelectorAll('.nav-btn');
+  const sections = document.querySelectorAll('.section');
+  const earthContainer = document.getElementById('earthContainer');
+  const radarBg = document.getElementById('radarBg');
+
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.section;
+
+      navButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      sections.forEach(s => {
+        s.classList.toggle('active', s.id === target);
+      });
+
+      earthContainer.classList.toggle('visible', target === 'worldtime');
+      radarBg.classList.toggle('visible', target === 'stopwatch');
+
+      if (window.innerWidth <= 768) {
+        sidebar.classList.remove('open');
+        sidebarHint.classList.remove('hidden');
+      }
+    });
+  });
+
+  /* ============================================================
+     СЕКУНДОМЕР
+  ============================================================ */
+  const swDisplay = document.getElementById('swDisplay');
+  const swStart   = document.getElementById('swStart');
+  const swLap     = document.getElementById('swLap');
+  const swReset   = document.getElementById('swReset');
+  const swLaps    = document.getElementById('swLaps');
+
+  let swRunning = false;
+  let swStartTime = 0;
+  let swElapsed = 0;
+  let swInterval = null;
+  let swLapCount = 0;
+  let swLastLapTime = 0;
+
+  function formatTime(ms) {
+    const totalMs = Math.floor(ms);
+    const hundredths = Math.floor((totalMs % 1000) / 10);
+    const totalSeconds = Math.floor(totalMs / 1000);
+    const seconds = totalSeconds % 60;
+    const minutes = Math.floor(totalSeconds / 60) % 60;
+    const hours = Math.floor(totalSeconds / 3600);
+
+    const pad = (n) => String(n).padStart(2, '0');
+
+    if (hours > 0) {
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}<span class="ms">.${pad(hundredths)}</span>`;
+    }
+    return `${pad(minutes)}:${pad(seconds)}<span class="ms">.${pad(hundredths)}</span>`;
+  }
+
+  function formatLap(ms) {
+    const totalMs = Math.floor(ms);
+    const hundredths = Math.floor((totalMs % 1000) / 10);
+    const totalSeconds = Math.floor(totalMs / 1000);
+    const seconds = totalSeconds % 60;
+    const minutes = Math.floor(totalSeconds / 60) % 60;
+    const hours = Math.floor(totalSeconds / 3600);
+
+    const pad = (n) => String(n).padStart(2, '0');
+
+    if (hours > 0) {
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}.${pad(hundredths)}`;
+    }
+    return `${pad(minutes)}:${pad(seconds)}.${pad(hundredths)}`;
+  }
+
+  function updateStopwatch() {
+    swElapsed = performance.now() - swStartTime;
+    swDisplay.innerHTML = formatTime(swElapsed);
+  }
+
+  swStart.addEventListener('click', () => {
+    if (!swRunning) {
+      swStartTime = performance.now() - swElapsed;
+      swInterval = setInterval(updateStopwatch, 10);
+      swRunning = true;
+      swStart.textContent = 'Пауза';
+      swStart.classList.remove('primary');
+      swLap.disabled = false;
+    } else {
+      clearInterval(swInterval);
+      swRunning = false;
+      swStart.textContent = 'Продолжить';
+      swStart.classList.add('primary');
+    }
+  });
+
+  swLap.addEventListener('click', () => {
+    if (!swRunning) return;
+
+    const totalElapsed = performance.now() - swStartTime;
+    const lapTime = totalElapsed - swLastLapTime;
+    swLastLapTime = totalElapsed;
+    swLapCount++;
+
+    const lapEl = document.createElement('div');
+    lapEl.className = 'lap';
+    lapEl.innerHTML = `
+      <span class="lap-num">Круг ${swLapCount}</span>
+      <span class="lap-time">${formatLap(lapTime)}</span>
+    `;
+    swLaps.prepend(lapEl);
+  });
+
+  swReset.addEventListener('click', () => {
+    clearInterval(swInterval);
+    swRunning = false;
+    swElapsed = 0;
+    swLapCount = 0;
+    swLastLapTime = 0;
+    swDisplay.innerHTML = '00:00<span class="ms">.00</span>';
+    swLaps.innerHTML = '';
+    swStart.textContent = 'Старт';
+    swStart.classList.add('primary');
+    swLap.disabled = true;
+  });
+
+  /* ============================================================
+     МИРОВОЕ ВРЕМЯ
+  ============================================================ */
+  const cities = [
+    { name: 'Москва',        country: 'Россия',        tz: 'Europe/Moscow' },
+    { name: 'Лондон',        country: 'Великобритания', tz: 'Europe/London' },
+    { name: 'Нью-Йорк',      country: 'США',           tz: 'America/New_York' },
+    { name: 'Лос-Анджелес',  country: 'США',           tz: 'America/Los_Angeles' },
+    { name: 'Париж',         country: 'Франция',       tz: 'Europe/Paris' },
+    { name: 'Токио',         country: 'Япония',        tz: 'Asia/Tokyo' },
+    { name: 'Дубай',         country: 'ОАЭ',           tz: 'Asia/Dubai' },
+    { name: 'Сидней',        country: 'Австралия',     tz: 'Australia/Sydney' },
+    { name: 'Пекин',         country: 'Китай',         tz: 'Asia/Shanghai' },
+    { name: 'Сан-Паулу',     country: 'Бразилия',      tz: 'America/Sao_Paulo' },
+    { name: 'Берлин',        country: 'Германия',      tz: 'Europe/Berlin' },
+    { name: 'Дели',          country: 'Индия',         tz: 'Asia/Kolkata' }
+  ];
+
+  const grid = document.getElementById('clockGrid');
+
+  const cards = cities.map(city => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="day-part"></div>
+      <div class="city">${city.name}</div>
+      <div class="country">${city.country}</div>
+      <div class="time">--:--:--</div>
+      <div class="date"></div>
+    `;
+    grid.appendChild(card);
+    return {
+      timeEl: card.querySelector('.time'),
+      dateEl: card.querySelector('.date'),
+      partEl: card.querySelector('.day-part'),
+      tz: city.tz
+    };
+  });
+
+  function getDayPart(hour) {
+    if (hour >= 5 && hour < 12) return '🌅';
+    if (hour >= 12 && hour < 17) return '☀️';
+    if (hour >= 17 && hour < 22) return '🌆';
+    return '🌙';
+  }
+
+  function updateClocks() {
+    const now = new Date();
+    cards.forEach(card => {
+      const timeStr = now.toLocaleTimeString('ru-RU', {
+        timeZone: card.tz, hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+      const dateStr = now.toLocaleDateString('ru-RU', {
+        timeZone: card.tz, weekday: 'short', day: 'numeric', month: 'long'
+      });
+      const hour = parseInt(now.toLocaleTimeString('en-US', {
+        timeZone: card.tz, hour: '2-digit', hour12: false
+      }), 10);
+
+      card.timeEl.textContent = timeStr;
+      card.dateEl.textContent = dateStr;
+      card.partEl.textContent = getDayPart(hour);
+    });
+  }
+
+  updateClocks();
+  setInterval(updateClocks, 1000);
+</script>
+</body>
+</html>
